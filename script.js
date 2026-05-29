@@ -2,10 +2,26 @@
    НАСТРОЙКИ — поменяй под себя (это единственное, что нужно править)
    ===================================================================== */
 const CONFIG = {
-  herName: "Молли",            // имя твоей девушки
+  herName: "Жанна",            // имя твоей девушки
   myName: "Я",                 // твоё имя (как подписать "от кого")
-  telegramUsername: "",        // твой ник в Telegram без @, напр. "ivan" — кнопка откроет чат с тобой
+
+  // --- Куда придут её ответы автоматически (заполни ОДИН из вариантов) ---
+  // Вариант 1 (рекомендую): Telegram-бот. Ответы прилетят тебе в личку мгновенно.
+  //   1) В Telegram напиши @BotFather → /newbot → получишь ТОКЕН
+  //   2) Напиши своему боту любое сообщение, затем узнай свой chat id у @userinfobot
+  telegramBotToken: "",        // напр. "7712345678:AAH...xyz"
+  telegramChatId: "",          // напр. "123456789"
+
+  // Вариант 2: Formspree (ответы придут тебе на e-mail). Зарегистрируйся на formspree.io,
+  //   создай форму и вставь её ID (часть после /f/ в ссылке вида formspree.io/f/abcwxyz)
+  formspreeId: "",             // напр. "mzzbqwer"
+
+  // --- Запасные кнопки "поделиться" (если автоотправка не настроена) ---
+  telegramUsername: "",        // твой ник в Telegram без @, напр. "ivan"
   whatsappNumber: "",          // твой номер для WhatsApp в формате 79991234567 (без +, пробелов)
+
+  // --- Романтическая фоновая музыка ---
+  music: true,                 // true — играет нежная мелодия (с кнопкой вкл/выкл)
 };
 
 /* =====================================================================
@@ -304,13 +320,52 @@ function renderDots() {
 
 function renderOutro(section) {
   const card = el("div", "card hero");
+  const hasAuto = !!(CONFIG.telegramBotToken && CONFIG.telegramChatId) || !!CONFIG.formspreeId;
   card.innerHTML = `
     <span class="big-emoji">${section.emoji}</span>
     <h1>${section.title}</h1>
-    <p>Спасибо, что заполнила 💕 Осталось отправить мне твои ответы — выбери удобный способ ниже.</p>
+    <p>Спасибо, что заполнила 💕 ${hasAuto
+      ? "Нажми кнопку ниже — и твои ответы сразу прилетят мне."
+      : "Осталось отправить мне твои ответы — выбери удобный способ ниже."}</p>
   `;
 
   const summary = buildSummary();
+
+  // --- Автоматическая отправка (если настроена) ---
+  if (hasAuto) {
+    const sendBtn = el("button", "btn btn-primary");
+    sendBtn.textContent = "Отправить мои ответы 💕";
+    sendBtn.style.width = "100%";
+    sendBtn.style.marginBottom = "12px";
+
+    const status = el("div", "send-status");
+
+    sendBtn.onclick = async () => {
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Отправляю... 💌";
+      status.className = "send-status";
+      status.textContent = "";
+      try {
+        await sendAnswers(summary);
+        status.classList.add("ok");
+        status.textContent = "Готово! Твои ответы отправлены 💖 Спасибо, любимая.";
+        sendBtn.textContent = "Отправлено ✓";
+        burst();
+      } catch (e) {
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Попробовать ещё раз 🔁";
+        status.classList.add("err");
+        status.textContent = "Не получилось отправить автоматически 😔 Воспользуйся кнопками ниже — они точно сработают.";
+      }
+    };
+
+    card.appendChild(sendBtn);
+    card.appendChild(status);
+
+    const orline = el("div", "or-line");
+    orline.textContent = "или отправь вручную";
+    card.appendChild(orline);
+  }
 
   const share = el("div", "share-buttons");
 
@@ -410,6 +465,32 @@ function formatAnswer(val) {
   return String(val).trim();
 }
 
+/* ---------- Автоматическая отправка ответов тебе ---------- */
+async function sendAnswers(summary) {
+  // 1) Telegram-бот (приоритетный способ)
+  if (CONFIG.telegramBotToken && CONFIG.telegramChatId) {
+    const url = `https://api.telegram.org/bot${CONFIG.telegramBotToken}/sendMessage`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: CONFIG.telegramChatId, text: summary }),
+    });
+    if (!res.ok) throw new Error("telegram failed");
+    return true;
+  }
+  // 2) Formspree (ответы на e-mail)
+  if (CONFIG.formspreeId) {
+    const res = await fetch(`https://formspree.io/f/${CONFIG.formspreeId}`, {
+      method: "POST",
+      headers: { "Accept": "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ _subject: `Анкета: ${CONFIG.herName} 💕`, message: summary }),
+    });
+    if (!res.ok) throw new Error("formspree failed");
+    return true;
+  }
+  throw new Error("no transport configured");
+}
+
 function isLastQuestionSection() {
   const next = SECTIONS[current + 1];
   return next && next.type === "outro";
@@ -426,18 +507,7 @@ function el(tag, cls) {
   return e;
 }
 
-/* ---------- Toast ---------- */
-let toastTimer;
-function toast(msg) {
-  let t = document.querySelector(".toast");
-  if (!t) { t = el("div", "toast"); document.body.appendChild(t); }
-  t.textContent = msg;
-  t.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
-}
-
-/* ---------- Плавающие сердечки ---------- */
+/* ---------- Плавающие сердечки (фон) ---------- */
 function spawnHeart() {
   const hearts = document.getElementById("hearts");
   const h = el("div", "heart");
@@ -453,5 +523,133 @@ function spawnHeart() {
 setInterval(spawnHeart, 900);
 for (let i = 0; i < 6; i++) setTimeout(spawnHeart, i * 300);
 
+/* ---------- Всплеск сердечек (при отправке) ---------- */
+function burst() {
+  const hearts = document.getElementById("hearts");
+  const emojis = ["💖", "💕", "💗", "✨", "🎉", "💞"];
+  for (let i = 0; i < 28; i++) {
+    const h = el("div", "heart");
+    h.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    h.style.left = Math.random() * 100 + "vw";
+    h.style.fontSize = 18 + Math.random() * 26 + "px";
+    const dur = 4 + Math.random() * 3;
+    h.style.animationDuration = dur + "s";
+    hearts.appendChild(h);
+    setTimeout(() => h.remove(), dur * 1000);
+  }
+}
+
+/* ---------- Романтическая фоновая музыка (Web Audio, без файлов) ---------- */
+const Music = (function () {
+  let ctx, master, filter, loopTimer, playing = false, step = 0;
+  // Нежная прогрессия аккордов (C – G – Am – F), мягкое пианино-пэд
+  const chords = [
+    [261.63, 329.63, 392.00],   // C
+    [196.00, 246.94, 392.00],   // G
+    [220.00, 261.63, 329.63],   // Am
+    [174.61, 220.00, 349.23],   // F
+  ];
+
+  function ensure() {
+    if (ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = 0.0;
+    filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 1600;
+    filter.connect(master);
+    master.connect(ctx.destination);
+  }
+
+  function voice(freq, t, dur, gain) {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = freq;
+    o.connect(g); g.connect(filter);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 1.4);          // мягкая атака
+    g.gain.linearRampToValueAtTime(gain * 0.7, t + dur * 0.6);
+    g.gain.linearRampToValueAtTime(0, t + dur);             // плавное затухание
+    o.start(t);
+    o.stop(t + dur + 0.1);
+  }
+
+  function tick() {
+    const now = ctx.currentTime;
+    const dur = 4.2;
+    const chord = chords[step % chords.length];
+    chord.forEach((f, i) => voice(f, now + 0.02, dur, i === 0 ? 0.10 : 0.07));
+    // нежная мелодичная нота сверху
+    voice(chord[2] * 2, now + 1.0, 2.4, 0.045);
+    step++;
+    loopTimer = setTimeout(tick, dur * 1000 - 200);
+  }
+
+  function play() {
+    ensure();
+    if (ctx.state === "suspended") ctx.resume();
+    if (playing) return;
+    playing = true;
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 1.5);
+    tick();
+    updateBtn();
+  }
+
+  function pause() {
+    if (!ctx || !playing) return;
+    playing = false;
+    clearTimeout(loopTimer);
+    master.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
+    updateBtn();
+  }
+
+  function toggle() { playing ? pause() : play(); localStorage.setItem("formolly_music", playing ? "on" : "off"); }
+  function isPlaying() { return playing; }
+
+  let btn;
+  function updateBtn() {
+    if (!btn) return;
+    btn.textContent = playing ? "🎵" : "🔇";
+    btn.classList.toggle("muted", !playing);
+  }
+  function mountButton() {
+    btn = el("button", "music-btn");
+    btn.type = "button";
+    btn.setAttribute("aria-label", "Музыка вкл/выкл");
+    btn.onclick = toggle;
+    document.body.appendChild(btn);
+    updateBtn();
+  }
+
+  return { play, pause, toggle, isPlaying, mountButton };
+})();
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(msg) {
+  let t = document.querySelector(".toast");
+  if (!t) { t = el("div", "toast"); document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
 /* ---------- Старт ---------- */
+if (CONFIG.music) {
+  Music.mountButton();
+  // Браузеры разрешают звук только после действия пользователя — запускаем на первом касании
+  const startMusic = () => {
+    if (localStorage.getItem("formolly_music") !== "off") Music.play();
+    window.removeEventListener("pointerdown", startMusic);
+    window.removeEventListener("click", startMusic);
+  };
+  window.addEventListener("pointerdown", startMusic, { once: false });
+  window.addEventListener("click", startMusic, { once: false });
+}
+
 render();

@@ -363,3 +363,53 @@ input[type="range"]::-moz-range-thumb {
   .hero h1 { font-size: 36px; }
   .card h2 { font-size: 21px; }
 }
+
+
+/* ---------- Кнопка музыки ---------- */
+.music-btn {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 40;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 6px 16px rgba(255, 94, 156, 0.35);
+  transition: transform 0.15s, background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.music-btn:active { transform: scale(0.9); }
+.music-btn.muted { opacity: 0.7; }
+
+/* ---------- Статус отправки и разделитель ---------- */
+.send-status {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 4px 0 6px;
+  min-height: 1px;
+}
+.send-status.ok { color: #2bb84f; font-weight: 700; }
+.send-status.err { color: var(--pink-deep); }
+
+.or-line {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 13px;
+  margin: 16px 0 14px;
+}
+.or-line::before, .or-line::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 126, 179, 0.35);
+}
+.or-line::before { margin-right: 12px; }
+.or-line::after { margin-left: 12px; }
